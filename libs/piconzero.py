@@ -32,17 +32,17 @@ def get_revision():
     """
     Get version and revision info
 
-    :return: the version of the board
+    :return: the version of the board and the board type in a list
     """
     for i in range(RETRIES):
         try:
             rval = bus.read_word_data(pzaddr, 0)
-            return [rval / 256, rval % 256]
+            return [rval / 256, rval % 256]  # firmware is first, board type is second
         except Exception as e:
             if DEBUG:
                 print("error in get_revision(), retrying", file=sys.stderr)
                 print(e, file=sys.stderr)
-revision = get_revision()  # store the firmware revision
+revision = get_revision()[0]  # store the firmware revision
 
 def set_motor(motor, value):
     """
