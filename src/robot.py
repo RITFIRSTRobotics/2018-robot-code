@@ -9,7 +9,7 @@ from core.network.Packet import Packet, PacketType
 from core.network.constants import *
 from core.network.packetdata import MovementData
 
-import lib.piconzero as piconzero
+import libs.piconzero as piconzero
 from core.network.packetdata.RequestData import RequestData
 from core.network.packetdata.RobotStateData import RobotStateData
 
