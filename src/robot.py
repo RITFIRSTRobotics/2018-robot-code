@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import socket
@@ -5,6 +6,7 @@ import logging
 import jsonpickle
 from logging.handlers import RotatingFileHandler
 
+sys.path.append(os.getcwd())
 from core.network.Packet import Packet, PacketType
 from core.network.constants import *
 from core.network.packetdata import MovementData
@@ -78,7 +80,8 @@ def main():
     sock = socket.socket()
 
     # Figure out and log the ip of the robot
-    ip = socket.gethostbyname(socket.gethostname())
+#    ip = socket.gethostbyname(socket.gethostname())
+    ip = "10.0.1.10"
     logger.info("using ip: `" + ip + "`")
     sock.bind((ip, PORT))  # bind it to the socket
     sock.listen(5)  # listen for incoming data
@@ -88,8 +91,13 @@ def main():
     # Initialization should be done now, start accepting packets
     while True:
         try:
+            # Get a connection
+            csock, addr = sock.accept()
+
             # Accept a packet
-            pack = jsonpickle.decode(sock.recv(BUFFER_SIZE).decode())  # recieve packets, decode them, then de-json them
+            pack = jsonpickle.decode(csock.recv(BUFFER_SIZE).decode())  # recieve packets, decode them, then de-json them
+
+            print(pack.data)
 
             # Type-check the data
             if type(pack) is not Packet:
