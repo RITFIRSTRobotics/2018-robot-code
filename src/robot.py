@@ -24,13 +24,16 @@ def process_data(pack):
     """
 
     # See if the data is MovementData
-    if type(pack.data) is MovementData:
+    if type(pack.data) is MovementData.MovementData:
+
         # move robot
         pack.data.scale()
 
         # bindings for old code
         s_forw = pack.data.stick_y
         s_side = pack.data.stick_x
+
+        print("stick x " + str(pack.data.stick_x))
 
         # Calculate motor outputs
         if pack.data.stick_x < CONTROLLER_DEADZONE and pack.data.stick_y < CONTROLLER_DEADZONE:
@@ -51,6 +54,7 @@ def process_data(pack):
             else:
                 left_motor = s_forw - s_side
                 right_motor = -1 * max(-s_forw, -s_side)
+        print("left motor " + str(left_motor))
 
         # Range check
         if left_motor > 0:
@@ -63,6 +67,7 @@ def process_data(pack):
             right_motor = max(right_motor, -128)
 
         piconzero.set_motor(piconzero.MOTORA, left_motor)
+        print("left motor " + str(left_motor))
         piconzero.set_motor(piconzero.MOTORB, right_motor)
 
 
@@ -97,8 +102,6 @@ def main():
             # Accept a packet
             pack = jsonpickle.decode(csock.recv(BUFFER_SIZE).decode())  # recieve packets, decode them, then de-json them
 
-            print(pack.data)
-
             # Type-check the data
             if type(pack) is not Packet:
                 print("pack is not a Packet", file=sys.stderr)
@@ -113,15 +116,19 @@ def main():
                         continue
                     elif pack.data == RobotStateData.DISABLE:
                         robot_disabled = True
+                        piconzero.cleanup()
                         continue
                     elif pack.data == RobotStateData.E_STOP:
+                        piconzero.cleanup()
                         break
             elif pack.type == PacketType.REQUEST:
                 # Check for the request type
                 if pack.data == RequestData.STATUS:
                     # Send a response
                     fms_sock = socket.socket()  # make a new socket
+                    fms_sock.settimeout(.05)
                     fms_sock.connect((FMS_IP, PORT))
+
                     packet = Packet(PacketType.RESPONSE,  # generate a packet saying if the robot is enabled or disabled
                                     RobotStateData.DISABLE if robot_disabled else RobotStateData.ENABLE)
                     fms_sock.send(jsonpickle.encode(packet).encode())  # encode and send
@@ -157,6 +164,7 @@ def main():
         if pack.type == PacketType.REQUEST:
             # Send a response, no matter the request type
             fms_sock = socket.socket()  # make a new socket
+            fms_sock.settimeout(.2)
             fms_sock.connect((FMS_IP, PORT))
             packet = Packet(PacketType.RESPONSE, RobotStateData.E_STOP)  # generate a packet saying that this robot is e-stopped
             fms_sock.send(jsonpickle.encode(packet).encode())  # encode and send
