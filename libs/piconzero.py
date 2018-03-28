@@ -265,6 +265,7 @@ def init(debug=False):
         try:
             bus.write_byte_data(pzaddr, RESET, 0)
             time.sleep(0.01)  # 1ms delay to allow time to complete
+            revision = get_revision()[0]  # update the revision number after the board has been initialized
             return EXIT_SUCCESS
         except Exception as e:
             if DEBUG:
