@@ -6,7 +6,10 @@ import logging
 import jsonpickle
 from logging.handlers import RotatingFileHandler
 
-sys.path.append(os.getcwd())
+from Watchdog import Watchdog
+from core.network.utils import get_ip
+
+sys.path.append(os.getcwd())  # have to add this for core
 from core.network.Packet import Packet, PacketType
 from core.network.constants import *
 from core.network.packetdata import MovementData
@@ -16,24 +19,37 @@ from core.network.packetdata.RequestData import RequestData
 from core.network.packetdata.RobotStateData import RobotStateData
 
 
+# Some constants
+SHOOTER_ROBOT = False
+GRIPPER_ROBOT = False
+WATCHDOG_TIME = 4
+
+SHOOTER_MOTOR_CHANNEL = 0
+
+LIFT_SERVO_MIN = -20
+LIFT_SERVO_MAX = 60
+GRIP_SERVO_MIN = 0
+GRIP_SERVO_MAX = 100
+LIFT_SERVO_CHANNEL = 0
+GRIP_SERVO_CHANNEL = 1
+lift_servo_pos = 0
+grip_servo_pos = GRIP_SERVO_MIN
+grip_servo_prev = False
+
+
 def process_data(pack):
     """
     Process a packet's data
 
     :param pack: a packet with data in it
     """
+    global grip_servo_prev, grip_servo_pos, lift_servo_pos
 
     # See if the data is MovementData
     if type(pack.data) is MovementData.MovementData:
-
-        # move robot
-        pack.data.scale()
-
         # bindings for old code
-        s_forw = pack.data.stick_y
-        s_side = pack.data.stick_x
-
-        print("stick x " + str(pack.data.stick_x))
+        pack.data.scale()
+        s_side, s_forw = pack.get_stick0()
 
         # Calculate motor outputs
         if pack.data.stick_x < CONTROLLER_DEADZONE and pack.data.stick_y < CONTROLLER_DEADZONE:
@@ -54,7 +70,6 @@ def process_data(pack):
             else:
                 left_motor = s_forw - s_side
                 right_motor = -1 * max(-s_forw, -s_side)
-        print("left motor " + str(left_motor))
 
         # Range check
         if left_motor > 0:
@@ -67,8 +82,33 @@ def process_data(pack):
             right_motor = max(right_motor, -128)
 
         piconzero.set_motor(piconzero.MOTORA, left_motor)
-        print("left motor " + str(left_motor))
         piconzero.set_motor(piconzero.MOTORB, right_motor)
+
+    if SHOOTER_ROBOT:
+        piconzero.set_output(SHOOTER_MOTOR_CHANNEL, 80 if pack.buttons[2] == True else 0)
+
+    if GRIPPER_ROBOT:
+        toggle_button = pack.buttons[2]
+
+        # See if the gripper needs to change
+        if toggle_button != grip_servo_prev:
+            if grip_servo_pos == GRIP_SERVO_MIN:
+                grip_servo_pos = GRIP_SERVO_MAX
+            else:
+                grip_servo_pos = GRIP_SERVO_MIN
+            piconzero.set_output(GRIP_SERVO_CHANNEL, grip_servo_pos)
+
+        # Now for the lift servo
+        lift_servo_pos += int(pack.sticks[3] / 4.0)
+        if lift_servo_pos > LIFT_SERVO_MAX or lift_servo_pos < LIFT_SERVO_MIN:
+            if lift_servo_pos > LIFT_SERVO_MAX:
+                lift_servo_pos = LIFT_SERVO_MAX
+            else:
+                lift_servo_pos = LIFT_SERVO_MIN
+
+        piconzero.set_output(LIFT_SERVO_CHANNEL, lift_servo_pos)
+
+        grip_servo_prev = toggle_button  # save for later
 
 
 def main():
@@ -85,22 +125,28 @@ def main():
     sock = socket.socket()
 
     # Figure out and log the ip of the robot
-#    ip = socket.gethostbyname(socket.gethostname())
-    ip = "10.0.1.10"
+    ip = get_ip()
     logger.info("using ip: `" + ip + "`")
     sock.bind((ip, PORT))  # bind it to the socket
     sock.listen(5)  # listen for incoming data
 
+    # Make robot stuff
     robot_disabled = True
+    watchdog = Watchdog(logger)
+
+    if SHOOTER_ROBOT:
+        piconzero.set_output_config(SHOOTER_MOTOR_CHANNEL, 1)  # set channel 0 to PWM mode
+    if GRIPPER_ROBOT:
+        piconzero.set_output_config(LIFT_SERVO_CHANNEL, 2)
+        piconzero.set_output_config(GRIP_SERVO_CHANNEL, 2)  # set channel 0 and 1 to Servo mode
 
     # Initialization should be done now, start accepting packets
     while True:
         try:
             # Get a connection
             csock, addr = sock.accept()
-
-            # Accept a packet
             pack = jsonpickle.decode(csock.recv(BUFFER_SIZE).decode())  # recieve packets, decode them, then de-json them
+            watchdog.reset()
 
             # Type-check the data
             if type(pack) is not Packet:
@@ -158,7 +204,8 @@ def main():
         piconzero.cleanup()
 
         # Accept a packet
-        pack = jsonpickle.decode(sock.recv(BUFFER_SIZE).decode())  # receive packets, decode them, then de-json them
+        csock, addr = sock.accept()
+        pack = jsonpickle.decode(csock.recv(BUFFER_SIZE).decode())  # receive packets, decode them, then de-json them
 
         # Check for a request
         if pack.type == PacketType.REQUEST:
