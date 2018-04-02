@@ -28,6 +28,7 @@ SHOOTER_MOTOR_CHANNEL = 0
 
 LIFT_SERVO_MIN = -20
 LIFT_SERVO_MAX = 60
+LIFT_SERVO_SPEEDMOD = 32.0
 GRIP_SERVO_MIN = 0
 GRIP_SERVO_MAX = 100
 LIFT_SERVO_CHANNEL = 0
@@ -99,7 +100,7 @@ def process_data(pack):
             piconzero.set_output(GRIP_SERVO_CHANNEL, grip_servo_pos)
 
         # Now for the lift servo
-        lift_servo_pos += int(pack.sticks[3] / 4.0)
+        lift_servo_pos += int(pack.sticks[3] / LIFT_SERVO_SPEEDMOD)
         if lift_servo_pos > LIFT_SERVO_MAX or lift_servo_pos < LIFT_SERVO_MIN:
             if lift_servo_pos > LIFT_SERVO_MAX:
                 lift_servo_pos = LIFT_SERVO_MAX
