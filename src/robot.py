@@ -6,10 +6,10 @@ import logging
 import jsonpickle
 from logging.handlers import RotatingFileHandler
 
-from Watchdog import Watchdog
+sys.path.append(os.getcwd())  # have to add this for core
+from src.Watchdog import Watchdog
 from core.network.utils import get_ip
 
-sys.path.append(os.getcwd())  # have to add this for core
 from core.network.Packet import Packet, PacketType
 from core.network.constants import *
 from core.network.packetdata import MovementData
@@ -22,12 +22,11 @@ from core.network.packetdata.RobotStateData import RobotStateData
 # Some constants
 SHOOTER_ROBOT = False
 GRIPPER_ROBOT = False
-WATCHDOG_TIME = 4
 
 SHOOTER_MOTOR_CHANNEL = 0
 
-LIFT_SERVO_MIN = -20
-LIFT_SERVO_MAX = 60
+LIFT_SERVO_MIN = 0
+LIFT_SERVO_MAX = 50
 LIFT_SERVO_SPEEDMOD = 32.0
 GRIP_SERVO_MIN = 0
 GRIP_SERVO_MAX = 100
@@ -50,10 +49,10 @@ def process_data(pack):
     if type(pack.data) is MovementData.MovementData:
         # bindings for old code
         pack.data.scale()
-        s_side, s_forw = pack.get_stick0()
+        s_side, s_forw = pack.data.get_stick0()
 
         # Calculate motor outputs
-        if pack.data.stick_x < CONTROLLER_DEADZONE and pack.data.stick_y < CONTROLLER_DEADZONE:
+        if pack.data.sticks[0] < CONTROLLER_DEADZONE and pack.data.sticks[1] < CONTROLLER_DEADZONE:
             # First, check deadzones
             left_motor = 0
             right_motor = 0
@@ -86,10 +85,10 @@ def process_data(pack):
         piconzero.set_motor(piconzero.MOTORB, right_motor)
 
     if SHOOTER_ROBOT:
-        piconzero.set_output(SHOOTER_MOTOR_CHANNEL, 80 if pack.buttons[2] == True else 0)
+        piconzero.set_output(SHOOTER_MOTOR_CHANNEL, 80 if pack.data.buttons[2] == True else 0)
 
     if GRIPPER_ROBOT:
-        toggle_button = pack.buttons[2]
+        toggle_button = pack.data.buttons[2]
 
         # See if the gripper needs to change
         if toggle_button != grip_servo_prev:
@@ -100,7 +99,7 @@ def process_data(pack):
             piconzero.set_output(GRIP_SERVO_CHANNEL, grip_servo_pos)
 
         # Now for the lift servo
-        lift_servo_pos += int(pack.sticks[3] / LIFT_SERVO_SPEEDMOD)
+        lift_servo_pos += int(pack.data.sticks[2] / LIFT_SERVO_SPEEDMOD)
         if lift_servo_pos > LIFT_SERVO_MAX or lift_servo_pos < LIFT_SERVO_MIN:
             if lift_servo_pos > LIFT_SERVO_MAX:
                 lift_servo_pos = LIFT_SERVO_MAX
@@ -108,7 +107,7 @@ def process_data(pack):
                 lift_servo_pos = LIFT_SERVO_MIN
 
         piconzero.set_output(LIFT_SERVO_CHANNEL, lift_servo_pos)
-
+        print(lift_servo_pos)
         grip_servo_prev = toggle_button  # save for later
 
 
@@ -118,7 +117,7 @@ def main():
     handler = RotatingFileHandler('robot_log.log', "a", maxBytes=960000, backupCount=5)
     logger.addHandler(handler)
 
-    # initialize i2c and picon zero
+    # initalize i2c and piconzero
     piconzero.init()
 
     # Open the socket
@@ -126,7 +125,8 @@ def main():
     sock = socket.socket()
 
     # Figure out and log the ip of the robot
-    ip = get_ip()
+#    ip = get_ip()
+    ip = "10.0.1.10"
     logger.info("using ip: `" + ip + "`")
     sock.bind((ip, PORT))  # bind it to the socket
     sock.listen(5)  # listen for incoming data
@@ -160,6 +160,15 @@ def main():
                 if type(pack.data) is RobotStateData:
                     if pack.data == RobotStateData.ENABLE:
                         robot_disabled = False
+
+                        # Reinitialize the picon zero
+                        piconzero.init()
+                        if SHOOTER_ROBOT:
+                            piconzero.set_output_config(SHOOTER_MOTOR_CHANNEL, 1)  # set channel 0 to PWM mode
+                        if GRIPPER_ROBOT:
+                            piconzero.set_output_config(LIFT_SERVO_CHANNEL, 2)
+                            piconzero.set_output_config(GRIP_SERVO_CHANNEL, 2)  # set channel 0 and 1 to Servo mode
+
                         continue
                     elif pack.data == RobotStateData.DISABLE:
                         robot_disabled = True
@@ -174,11 +183,17 @@ def main():
                     # Send a response
                     fms_sock = socket.socket()  # make a new socket
                     fms_sock.settimeout(.05)
-                    fms_sock.connect((FMS_IP, PORT))
 
-                    packet = Packet(PacketType.RESPONSE,  # generate a packet saying if the robot is enabled or disabled
-                                    RobotStateData.DISABLE if robot_disabled else RobotStateData.ENABLE)
-                    fms_sock.send(jsonpickle.encode(packet).encode())  # encode and send
+                    try:
+                        fms_sock.connect((FMS_IP, PORT))
+                        packet = Packet(PacketType.RESPONSE,  # generate a packet saying if the robot is enabled or disabled
+                                        RobotStateData.DISABLE if robot_disabled else RobotStateData.ENABLE)
+
+                        fms_sock.send(jsonpickle.encode(packet).encode())  # encode and send
+
+                    except:
+                        pass
+
                     fms_sock.close()
             elif pack.type == PacketType.RESPONSE:
                 # do more stuff

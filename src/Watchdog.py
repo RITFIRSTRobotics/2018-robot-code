@@ -6,9 +6,9 @@ Watchdog for the robots (to kill the motors if the FMS becomes disconnected)
 import time
 from threading import Thread
 
-from robot import WATCHDOG_TIME
 import libs.piconzero as piconzero
 
+WATCHDOG_TIME = 4
 
 class Watchdog(Thread):
 
