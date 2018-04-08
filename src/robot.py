@@ -34,6 +34,11 @@ SHOOTER_MOTOR_CHANNEL = 0
 LIFT_SERVO_CHANNEL = 0
 GRIP_SERVO_CHANNEL = 1
 
+if SHOOTER_ROBOT:
+    SHOOTER_HIGH = 80
+    SHOOTER_MID = 40
+    SHOOTER_OFF = 0
+
 if GRIPPER_ROBOT0:
     LIFT_SERVO_MIN = 0
     LIFT_SERVO_MAX = 50
@@ -101,7 +106,12 @@ def process_data(pack):
         piconzero.set_motor(piconzero.MOTORB, right_motor)
 
     if SHOOTER_ROBOT:
-        piconzero.set_output(SHOOTER_MOTOR_CHANNEL, 80 if pack.data.buttons[2] == True else 0)
+        if pack.data.butttons[2]:
+            piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_HIGH)
+        elif pack.data.buttons[0]:
+            piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_MID)
+        else:
+            piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_OFF)
 
     if GRIPPER_ROBOT:
         toggle_button = pack.data.buttons[2]
