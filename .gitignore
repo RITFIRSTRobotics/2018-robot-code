@@ -105,3 +105,9 @@ ENV/
 
 # log files
 *.log.*
+
+# robot subsystem definitions
+.shooterbot
+.gripperbot0
+.gripperbot1
+

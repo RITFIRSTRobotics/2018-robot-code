@@ -6,33 +6,49 @@ import logging
 import jsonpickle
 from logging.handlers import RotatingFileHandler
 
-sys.path.append(os.getcwd())  # have to add this for core
+sys.path.append(os.getcwd())  # have to add this for local files
 from src.Watchdog import Watchdog
-from core.network.utils import get_ip
 
+import libs.piconzero as piconzero
+
+from core.network.utils import get_ip
 from core.network.Packet import Packet, PacketType
 from core.network.constants import *
 from core.network.packetdata import MovementData
-
-import libs.piconzero as piconzero
 from core.network.packetdata.RequestData import RequestData
 from core.network.packetdata.RobotStateData import RobotStateData
 
 
 # Some constants
-SHOOTER_ROBOT = False
-GRIPPER_ROBOT = False
+SHOOTER_ROBOT = os.path.isfile(".shooterbot")
+GRIPPER_ROBOT0 = os.path.isfile(".gripperbot0")
+GRIPPER_ROBOT1 = os.path.isfile(".gripperbot1")
+GRIPPER_ROBOT = GRIPPER_ROBOT0 or GRIPPER_ROBOT1
+
+if (SHOOTER_ROBOT and GRIPPER_ROBOT) or (GRIPPER_ROBOT0 and GRIPPER_ROBOT1):
+    print("multiple robot subsystems, exiting", file=sys.stderr)
+    exit(1)
 
 SHOOTER_MOTOR_CHANNEL = 0
 
-LIFT_SERVO_MIN = 0
-LIFT_SERVO_MAX = 50
-LIFT_SERVO_SPEEDMOD = 32.0
-GRIP_SERVO_MIN = 0
-GRIP_SERVO_MAX = 100
 LIFT_SERVO_CHANNEL = 0
 GRIP_SERVO_CHANNEL = 1
-lift_servo_pos = 0
+
+if GRIPPER_ROBOT0:
+    LIFT_SERVO_MIN = 0
+    LIFT_SERVO_MAX = 50
+    LIFT_SERVO_SPEEDMOD = 32.0
+    GRIP_SERVO_MIN = 0
+    GRIP_SERVO_MAX = 100
+
+if GRIPPER_ROBOT1:
+    LIFT_SERVO_MIN = 0
+    LIFT_SERVO_MAX = 50
+    LIFT_SERVO_SPEEDMOD = 32.0
+    GRIP_SERVO_MIN = 0
+    GRIP_SERVO_MAX = 100
+
+lift_servo_pos = LIFT_SERVO_MIN
 grip_servo_pos = GRIP_SERVO_MIN
 grip_servo_prev = False
 
@@ -125,8 +141,7 @@ def main():
     sock = socket.socket()
 
     # Figure out and log the ip of the robot
-#    ip = get_ip()
-    ip = "10.0.1.10"
+    ip = get_ip()
     logger.info("using ip: `" + ip + "`")
     sock.bind((ip, PORT))  # bind it to the socket
     sock.listen(5)  # listen for incoming data
