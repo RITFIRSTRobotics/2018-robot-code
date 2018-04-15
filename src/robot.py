@@ -40,8 +40,8 @@ if SHOOTER_ROBOT:
     SHOOTER_OFF = 0
 
 if GRIPPER_ROBOT0:
-    LIFT_SERVO_MIN = 0
-    LIFT_SERVO_MAX = 50
+    LIFT_SERVO_MIN = 43
+    LIFT_SERVO_MAX = 95
     LIFT_SERVO_SPEEDMOD = 32.0
     GRIP_SERVO_MIN = 0
     GRIP_SERVO_MAX = 100
@@ -71,36 +71,38 @@ def process_data(pack):
         # bindings for old code
         pack.data.scale()
         s_side, s_forw = pack.data.get_stick0()
+        s_side *= -1
 
         # Calculate motor outputs
-        if pack.data.sticks[0] < CONTROLLER_DEADZONE and pack.data.sticks[1] < CONTROLLER_DEADZONE:
+        if abs(s_forw) < CONTROLLER_DEADZONE and abs(s_side) < CONTROLLER_DEADZONE:
             # First, check deadzones
-            left_motor = 0
-            right_motor = 0
-        elif s_forw > 0:
-            if s_side > 0:
-                left_motor = s_forw - s_side
-                right_motor = max(s_forw, s_side)
-            else:
-                left_motor = max(s_forw, -s_side)
-                right_motor = s_forw + s_side
+            s_forw = 0
+            s_side = 0
         else:
-            if s_side > 0:
-                left_motor = -1 * max(-s_forw, s_side)
-                right_motor = s_forw + s_side
+            if s_forw > 0:
+                if s_side > 0:
+                    left_motor = s_forw - s_side
+                    right_motor = max(s_forw, s_side)
+                else:
+                    left_motor = max(s_forw, -s_side)
+                    right_motor = s_forw + s_side
             else:
-                left_motor = s_forw - s_side
-                right_motor = -1 * max(-s_forw, -s_side)
+                if s_side > 0:
+                    left_motor = -1 * max(-s_forw, s_side)
+                    right_motor = s_forw + s_side
+                else:
+                    left_motor = s_forw - s_side
+                    right_motor = -1 * max(-1 * s_forw, -1 * s_side)
 
         # Range check
-        if left_motor > 0:
+        if left_motor >= 0:
             left_motor = min(left_motor, 127)
         else:
-            left_motor = max(left_motor, -128)
-        if right_motor > 0:
+            left_motor = max(left_motor, -127)
+        if right_motor >= 0:
             right_motor = min(right_motor, 127)
         else:
-            right_motor = max(right_motor, -128)
+            right_motor = max(right_motor, -127)
 
         piconzero.set_motor(piconzero.MOTORA, left_motor)
         piconzero.set_motor(piconzero.MOTORB, right_motor)
@@ -133,7 +135,6 @@ def process_data(pack):
                 lift_servo_pos = LIFT_SERVO_MIN
 
         piconzero.set_output(LIFT_SERVO_CHANNEL, lift_servo_pos)
-        print(lift_servo_pos)
         grip_servo_prev = toggle_button  # save for later
 
 
@@ -151,7 +152,8 @@ def main():
     sock = socket.socket()
 
     # Figure out and log the ip of the robot
-    ip = get_ip()
+#    ip = get_ip()
+    ip = "10.0.1.10"
     logger.info("using ip: `" + ip + "`")
     sock.bind((ip, PORT))  # bind it to the socket
     sock.listen(5)  # listen for incoming data
