@@ -58,6 +58,10 @@ grip_servo_pos = GRIP_SERVO_MIN
 grip_servo_prev = False
 
 
+def square_scale(x):
+    return int(((x / 128)**2) * (128 if x > 0 else -128))
+
+
 def process_data(pack):
     """
     Process a packet's data
@@ -72,6 +76,8 @@ def process_data(pack):
         pack.data.scale()
         s_side, s_forw = pack.data.get_stick0()
         s_side *= -1
+        s_side = square_scale(s_side)
+        f_forw = square_scale(s_forw)
 
         # Calculate motor outputs
         if abs(s_forw) < CONTROLLER_DEADZONE and abs(s_side) < CONTROLLER_DEADZONE:
@@ -152,8 +158,7 @@ def main():
     sock = socket.socket()
 
     # Figure out and log the ip of the robot
-#    ip = get_ip()
-    ip = "10.0.1.10"
+    ip = get_ip("wlan0")
     logger.info("using ip: `" + ip + "`")
     sock.bind((ip, PORT))  # bind it to the socket
     sock.listen(5)  # listen for incoming data
