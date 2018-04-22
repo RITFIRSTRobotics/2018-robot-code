@@ -140,7 +140,7 @@ def process_data(pack):
             toggle_button = pack.data.buttons[2]
 
             # See if the gripper needs to change
-            if toggle_button != grip_servo_prev:
+            if toggle_button != grip_servo_prev and toggle_button == True:
                 if grip_servo_pos == GRIP_SERVO_MIN:
                     grip_servo_pos = GRIP_SERVO_MAX
                 else:
