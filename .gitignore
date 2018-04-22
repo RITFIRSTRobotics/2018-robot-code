@@ -109,4 +109,4 @@ ENV/
 # robot subsystem definitions
 .shooterbot
 .gripperbot
-
+.botsettings

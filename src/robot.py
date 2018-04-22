@@ -44,7 +44,15 @@ if GRIPPER_ROBOT:
     GRIP_SERVO_MIN = 0
     GRIP_SERVO_MAX = 100
 
-    # By reading settings from a file, it makes it tailor to the robot
+    # Check for the default file and copy it into the expected file if not found
+    if os.path.isfile(".botsettings.def") and not os.path.isfile(".botsettings"):
+        f_def = open(".botsettings.def", "r")
+        f = open(".botsettings", "a+")
+        f.write(f_def.readlines())
+        f.close()
+        f_def.close()
+
+    # By reading settings from a file, it makes it easier to tailor to the robot
     if os.path.isfile(".botsettings"):
         f = open(".botsettings", "r")
         for i, line in enumerate(f):
