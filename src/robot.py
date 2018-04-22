@@ -3,14 +3,14 @@ import sys
 import time
 import socket
 import logging
+from json import JSONDecodeError
+
 import jsonpickle
 from logging.handlers import RotatingFileHandler
 
 sys.path.append(os.getcwd())  # have to add this for local files
 from src.Watchdog import Watchdog
-
 import libs.piconzero as piconzero
-
 from core.network.utils import get_ip
 from core.network.Packet import Packet, PacketType
 from core.network.constants import *
@@ -21,11 +21,9 @@ from core.network.packetdata.RobotStateData import RobotStateData
 
 # Some constants
 SHOOTER_ROBOT = os.path.isfile(".shooterbot")
-GRIPPER_ROBOT0 = os.path.isfile(".gripperbot0")
-GRIPPER_ROBOT1 = os.path.isfile(".gripperbot1")
-GRIPPER_ROBOT = GRIPPER_ROBOT0 or GRIPPER_ROBOT1
+GRIPPER_ROBOT = os.path.isfile(".gripperbot")
 
-if (SHOOTER_ROBOT and GRIPPER_ROBOT) or (GRIPPER_ROBOT0 and GRIPPER_ROBOT1):
+if SHOOTER_ROBOT and GRIPPER_ROBOT:
     print("multiple robot subsystems, exiting", file=sys.stderr)
     exit(1)
 
@@ -39,23 +37,32 @@ if SHOOTER_ROBOT:
     SHOOTER_MID = 40
     SHOOTER_OFF = 0
 
-if GRIPPER_ROBOT0:
+if GRIPPER_ROBOT:
     LIFT_SERVO_MIN = 43
     LIFT_SERVO_MAX = 95
     LIFT_SERVO_SPEEDMOD = 32.0
     GRIP_SERVO_MIN = 0
     GRIP_SERVO_MAX = 100
 
-if GRIPPER_ROBOT1:
-    LIFT_SERVO_MIN = 0
-    LIFT_SERVO_MAX = 50
-    LIFT_SERVO_SPEEDMOD = 32.0
-    GRIP_SERVO_MIN = 0
-    GRIP_SERVO_MAX = 100
+    # By reading settings from a file, it makes it tailor to the robot
+    if os.path.isfile(".botsettings"):
+        f = open(".botsettings", "r")
+        for i, line in enumerate(f):
+            if i == 0:
+                LIFT_SERVO_MIN = int(line)
+            elif i == 1:
+                LIFT_SERVO_MAX = int(line)
+            elif i == 2:
+                LIFT_SERVO_SPEEDMOD = int(line)
+            elif i == 3:
+                GRIP_SERVO_MIN = int(line)
+            elif i == 4:
+                GRIP_SERVO_MAX = int(line)
+        f.close()
 
-lift_servo_pos = LIFT_SERVO_MIN
-grip_servo_pos = GRIP_SERVO_MIN
-grip_servo_prev = False
+    lift_servo_pos = LIFT_SERVO_MIN
+    grip_servo_pos = GRIP_SERVO_MIN
+    grip_servo_prev = False
 
 
 def square_scale(x):
@@ -82,8 +89,8 @@ def process_data(pack):
         # Calculate motor outputs
         if abs(s_forw) < CONTROLLER_DEADZONE and abs(s_side) < CONTROLLER_DEADZONE:
             # First, check deadzones
-            s_forw = 0
-            s_side = 0
+            left_motor = 0
+            right_motor = 0
         else:
             if s_forw > 0:
                 if s_side > 0:
@@ -113,35 +120,35 @@ def process_data(pack):
         piconzero.set_motor(piconzero.MOTORA, left_motor)
         piconzero.set_motor(piconzero.MOTORB, right_motor)
 
-    if SHOOTER_ROBOT:
-        if pack.data.butttons[2]:
-            piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_HIGH)
-        elif pack.data.buttons[0]:
-            piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_MID)
-        else:
-            piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_OFF)
-
-    if GRIPPER_ROBOT:
-        toggle_button = pack.data.buttons[2]
-
-        # See if the gripper needs to change
-        if toggle_button != grip_servo_prev:
-            if grip_servo_pos == GRIP_SERVO_MIN:
-                grip_servo_pos = GRIP_SERVO_MAX
+        if SHOOTER_ROBOT:
+            if pack.data.butttons[2]:
+                piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_HIGH)
+            elif pack.data.buttons[0]:
+                piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_MID)
             else:
-                grip_servo_pos = GRIP_SERVO_MIN
-            piconzero.set_output(GRIP_SERVO_CHANNEL, grip_servo_pos)
+                piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_OFF)
 
-        # Now for the lift servo
-        lift_servo_pos += int(pack.data.sticks[2] / LIFT_SERVO_SPEEDMOD)
-        if lift_servo_pos > LIFT_SERVO_MAX or lift_servo_pos < LIFT_SERVO_MIN:
-            if lift_servo_pos > LIFT_SERVO_MAX:
-                lift_servo_pos = LIFT_SERVO_MAX
-            else:
-                lift_servo_pos = LIFT_SERVO_MIN
+        if GRIPPER_ROBOT:
+            toggle_button = pack.data.buttons[2]
 
-        piconzero.set_output(LIFT_SERVO_CHANNEL, lift_servo_pos)
-        grip_servo_prev = toggle_button  # save for later
+            # See if the gripper needs to change
+            if toggle_button != grip_servo_prev:
+                if grip_servo_pos == GRIP_SERVO_MIN:
+                    grip_servo_pos = GRIP_SERVO_MAX
+                else:
+                    grip_servo_pos = GRIP_SERVO_MIN
+                piconzero.set_output(GRIP_SERVO_CHANNEL, grip_servo_pos)
+
+            # Now for the lift servo
+            lift_servo_pos += int(pack.data.sticks[2] / LIFT_SERVO_SPEEDMOD)
+            if lift_servo_pos > LIFT_SERVO_MAX or lift_servo_pos < LIFT_SERVO_MIN:
+                if lift_servo_pos > LIFT_SERVO_MAX:
+                    lift_servo_pos = LIFT_SERVO_MAX
+                else:
+                    lift_servo_pos = LIFT_SERVO_MIN
+
+            piconzero.set_output(LIFT_SERVO_CHANNEL, lift_servo_pos)
+            grip_servo_prev = toggle_button  # save for later
 
 
 def main():
@@ -178,8 +185,13 @@ def main():
         try:
             # Get a connection
             csock, addr = sock.accept()
-            pack = jsonpickle.decode(csock.recv(BUFFER_SIZE).decode())  # recieve packets, decode them, then de-json them
             watchdog.reset()
+            try:
+                pack = jsonpickle.decode(csock.recv(BUFFER_SIZE).decode())  # recieve packets, decode them, then de-json them
+            except JSONDecodeError as e:
+                print(e)
+                logger.warning(str(e))
+                continue
 
             # Type-check the data
             if type(pack) is not Packet:
