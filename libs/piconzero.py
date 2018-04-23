@@ -127,7 +127,7 @@ def set_input_config(channel, value, pullup=False):
     :return: status code
     """
     if channel >= 0 and channel <= 3 and value >= 0 and value <= 3:
-        if value == 2 and revision < 6:
+        if value == 2 and revision <= 6:
             return UNSUPPORTED
         if value == 0 and pullup == True:
             value = 128

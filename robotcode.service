@@ -1,0 +1,11 @@
+[Unit]
+Description=RIT FIRST ImagineRIT project code startup
+After=multi-user.target
+
+[Service]
+Type=idle
+WorkingDirectory=/home/pi/2018-robot-code
+ExecStart=/usr/bin/python3 /home/pi/2018-robot-code/src/robot.py
+
+[Install]
+WantedBy=multi-user.target

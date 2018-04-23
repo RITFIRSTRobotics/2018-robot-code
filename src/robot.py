@@ -61,7 +61,7 @@ if GRIPPER_ROBOT:
             elif i == 1:
                 LIFT_SERVO_MAX = int(line)
             elif i == 2:
-                LIFT_SERVO_SPEEDMOD = int(line)
+                LIFT_SERVO_SPEEDMOD = float(line)
             elif i == 3:
                 GRIP_SERVO_MIN = int(line)
             elif i == 4:
@@ -193,13 +193,13 @@ def main():
         try:
             # Get a connection
             csock, addr = sock.accept()
-            watchdog.reset()
             try:
                 pack = jsonpickle.decode(csock.recv(BUFFER_SIZE).decode())  # recieve packets, decode them, then de-json them
             except JSONDecodeError as e:
                 print(e)
                 logger.warning(str(e))
                 continue
+            watchdog.reset()
 
             # Type-check the data
             if type(pack) is not Packet:
