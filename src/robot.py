@@ -48,7 +48,8 @@ if GRIPPER_ROBOT:
     if os.path.isfile(".botsettings.def") and not os.path.isfile(".botsettings"):
         f_def = open(".botsettings.def", "r")
         f = open(".botsettings", "a+")
-        f.write(f_def.readlines())
+        for l in f_def.readlines():
+            f.write(l)
         f.close()
         f_def.close()
 
@@ -67,6 +68,7 @@ if GRIPPER_ROBOT:
             elif i == 4:
                 GRIP_SERVO_MAX = int(line)
         f.close()
+        print(GRIP_SERVO_MAX)
 
     lift_servo_pos = LIFT_SERVO_MIN
     grip_servo_pos = GRIP_SERVO_MIN
