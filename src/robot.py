@@ -92,8 +92,6 @@ def process_data(pack):
         # bindings for old code
         pack.data.scale()
         s_side, s_forw = pack.data.get_stick0()
-        s_side *= -1
-        s_side = square_scale(s_side)
         f_forw = square_scale(s_forw)
 
         # Calculate motor outputs
