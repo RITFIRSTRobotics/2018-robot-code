@@ -36,6 +36,7 @@ if SHOOTER_ROBOT:
     SHOOTER_HIGH = 80
     SHOOTER_MID = 40
     SHOOTER_OFF = 0
+    shooter_start = 0
 
 if GRIPPER_ROBOT:
     LIFT_SERVO_MIN = 43
@@ -85,7 +86,7 @@ def process_data(pack):
 
     :param pack: a packet with data in it
     """
-    global grip_servo_prev, grip_servo_pos, lift_servo_pos
+    global grip_servo_prev, grip_servo_pos, lift_servo_pos, shooter_start
 
     # See if the data is MovementData
     if type(pack.data) is MovementData.MovementData:
@@ -130,11 +131,18 @@ def process_data(pack):
 
         if SHOOTER_ROBOT:
             if pack.data.butttons[2]:
-                piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_HIGH)
+                if shooter_start == 0:
+                    shooter_start = time.time()
+                    piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_HIGH)
+                elif shooter_start - time.time() > 10:
+                    piconzero.set_output(SHOOTER_MOTOR_CHANNEL, 0)
+                else:
+                    piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_HIGH)
             elif pack.data.buttons[0]:
                 piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_MID)
             else:
                 piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_OFF)
+                shooter_start = 0
 
         if GRIPPER_ROBOT:
             toggle_button = pack.data.buttons[2]
