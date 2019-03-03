@@ -129,6 +129,7 @@ def process_data(pack):
         piconzero.set_motor(piconzero.MOTORA, left_motor)
         piconzero.set_motor(piconzero.MOTORB, right_motor)
 
+        # See if this is a shooter robot (experimental)
         if SHOOTER_ROBOT:
             if pack.data.butttons[2]:
                 if shooter_start == 0:
@@ -144,6 +145,7 @@ def process_data(pack):
                 piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_OFF)
                 shooter_start = 0
 
+        # See if this is a gripper robot
         if GRIPPER_ROBOT:
             toggle_button = pack.data.buttons[2]
 

@@ -5,6 +5,7 @@
 import sys
 import time
 import smbus  # note that you have to install smbus using apt
+import threading
 
 bus = smbus.SMBus(1)  # For revision 1 Raspberry Pi, change to bus = smbus.SMBus(0)
 pzaddr = 0x22  # I2C address of Picon Zero
@@ -27,6 +28,8 @@ UNSUPPORTED = -3
 # General variables
 DEBUG = False
 RETRIES = 10  # max number of retries for I2C calls
+revision = 255  # is overwritten on init
+l = threading.Lock()  # only allow one thread to access the picon
 
 def get_revision():
     """
@@ -34,15 +37,15 @@ def get_revision():
 
     :return: the version of the board and the board type in a list
     """
-    for i in range(RETRIES):
-        try:
-            rval = bus.read_word_data(pzaddr, 0)
-            return [rval / 256, rval % 256]  # firmware is first, board type is second
-        except Exception as e:
-            if DEBUG:
-                print("error in get_revision(), retrying", file=sys.stderr)
-                print(e, file=sys.stderr)
-revision = get_revision()[0]  # store the firmware revision
+    with l:
+        for i in range(RETRIES):
+            try:
+                rval = bus.read_word_data(pzaddr, 0)
+                return [rval / 256, rval % 256]  # firmware is first, board type is second
+            except Exception as e:
+                if DEBUG:
+                    print("error in get_revision(), retrying", file=sys.stderr)
+                    print(e, file=sys.stderr)
 
 def set_motor(motor, value):
     """
@@ -53,18 +56,19 @@ def set_motor(motor, value):
     :note: values of -127, -128, +127 are treated as always ON, so no PWM
     :return: 0 on success, something else on failure
     """
-    if motor >= 0 and motor <= 1 and value >= -128 and value < 128:
-        for i in range(RETRIES):
-            try:
-                bus.write_byte_data(pzaddr, motor, value)
-                return EXIT_SUCCESS  # exit function
-            except Exception as e:
-                if DEBUG:
-                    print("error in set_motor(), retrying", file=sys.stderr)
-                    print(e, file=sys.stderr)
+    with l:
+        if motor >= 0 and motor <= 1 and value >= -128 and value < 128:
+            for i in range(RETRIES):
+                try:
+                    bus.write_byte_data(pzaddr, motor, value)
+                    return EXIT_SUCCESS  # exit function
+                except Exception as e:
+                    if DEBUG:
+                        print("error in set_motor(), retrying", file=sys.stderr)
+                        print(e, file=sys.stderr)
 
-        return EXCEEDED_RETRIES  # return (indicating that retries was exceeded)
-    return INVALID_RANGE  # return (indicating error)
+            return EXCEEDED_RETRIES  # return (indicating that retries was exceeded)
+        return INVALID_RANGE  # return (indicating error)
 
 
 def read_input(channel):
@@ -77,16 +81,17 @@ def read_input(channel):
     :param channel: channel must be in range 0 to 3
     :return: status code
     """
-    if channel >= 0 and channel <= 3:
-        for i in range(RETRIES):
-            try:
-                return bus.read_word_data(pzaddr, channel + 1)
-            except Exception as e:
-                if DEBUG:
-                    print("error in read_input(), retrying", file=sys.stderr)
-                    print(e, file=sys.stderr)
-        return EXCEEDED_RETRIES
-    return INVALID_RANGE
+    with l:
+        if channel >= 0 and channel <= 3:
+            for i in range(RETRIES):
+                try:
+                    return bus.read_word_data(pzaddr, channel + 1)
+                except Exception as e:
+                    if DEBUG:
+                        print("error in read_input(), retrying", file=sys.stderr)
+                        print(e, file=sys.stderr)
+            return EXCEEDED_RETRIES
+        return INVALID_RANGE
 
 
 def set_output_config(output, value):
@@ -101,17 +106,18 @@ def set_output_config(output, value):
     :param value: the configuration value
     :return: status code
     """
-    if output >= 0 and output <= 5 and value >= 0 and value <= 3:
-        for i in range(RETRIES):
-            try:
-                bus.write_byte_data(pzaddr, OUTCFG0 + output, value)
-                return EXIT_SUCCESS
-            except Exception as e:
-                if DEBUG:
-                    print("error in set_output_config(), retrying", file=sys.stderr)
-                    print(e, file=sys.stderr)
-        return EXCEEDED_RETRIES
-    return INVALID_RANGE
+    with l:
+        if output >= 0 and output <= 5 and value >= 0 and value <= 3:
+            for i in range(RETRIES):
+                try:
+                    bus.write_byte_data(pzaddr, OUTCFG0 + output, value)
+                    return EXIT_SUCCESS
+                except Exception as e:
+                    if DEBUG:
+                        print("error in set_output_config(), retrying", file=sys.stderr)
+                        print(e, file=sys.stderr)
+            return EXCEEDED_RETRIES
+        return INVALID_RANGE
 
 
 def set_input_config(channel, value, pullup=False):
@@ -126,21 +132,22 @@ def set_input_config(channel, value, pullup=False):
     :param pullup: set to False by default, but can be set to True which will provide a 10K internal pullup resistor on the selected channel (firmware 08 and later)
     :return: status code
     """
-    if channel >= 0 and channel <= 3 and value >= 0 and value <= 3:
-        if value == 2 and revision <= 6:
-            return UNSUPPORTED
-        if value == 0 and pullup == True:
-            value = 128
-        for i in range(RETRIES):
-            try:
-                bus.write_byte_data(pzaddr, INCFG0 + channel, value)
-                return EXIT_SUCCESS
-            except Exception as e:
-                if DEBUG:
-                    print("Error in set_input_config(), retrying", file=sys.stderr)
-                    print(e, file=sys.stderr)
-        return EXCEEDED_RETRIES
-    return INVALID_RANGE
+    with l:
+        if channel >= 0 and channel <= 3 and value >= 0 and value <= 3:
+            if value == 2 and revision <= 6:
+                return UNSUPPORTED
+            if value == 0 and pullup == True:
+                value = 128
+            for i in range(RETRIES):
+                try:
+                    bus.write_byte_data(pzaddr, INCFG0 + channel, value)
+                    return EXIT_SUCCESS
+                except Exception as e:
+                    if DEBUG:
+                        print("error in set_input_config(), retrying", file=sys.stderr)
+                        print(e, file=sys.stderr)
+            return EXCEEDED_RETRIES
+        return INVALID_RANGE
 
 
 def set_output(channel, value):
@@ -155,17 +162,18 @@ def set_output(channel, value):
 
     :return: status code
     """
-    if (channel >= 0 and channel <= 5):
-        for i in range(RETRIES):
-            try:
-                bus.write_byte_data(pzaddr, OUTPUT0 + channel, value)
-                return EXIT_SUCCESS
-            except Exception as e:
-                if DEBUG:
-                    print("Error in set_output(), retrying", file=sys.stderr)
-                    print(e, file=sys.stderr)
-        return EXCEEDED_RETRIES
-    return INVALID_RANGE
+    with l:
+        if (channel >= 0 and channel <= 5):
+            for i in range(RETRIES):
+                try:
+                    bus.write_byte_data(pzaddr, OUTPUT0 + channel, value)
+                    return EXIT_SUCCESS
+                except Exception as e:
+                    if DEBUG:
+                        print("error in set_output(), retrying", file=sys.stderr)
+                        print(e, file=sys.stderr)
+            return EXCEEDED_RETRIES
+        return INVALID_RANGE
 
 
 def set_pixel(Pixel, Red, Green, Blue, Update=True):
@@ -178,16 +186,17 @@ def set_pixel(Pixel, Red, Green, Blue, Update=True):
     :param Update: update the pixel data immediately (as it takes time)
     :return: status code
     """
-    pixelData = [Pixel, Red, Green, Blue]
-    for i in range(RETRIES):
-        try:
-            bus.write_i2c_block_data(pzaddr, Update, pixelData)
-            return EXIT_SUCCESS
-        except Exception as e:
-            if DEBUG:
-                print("Error in set_pixel(), retrying", file=sys.stderr)
-                print(e, file=sys.stderr)
-    return EXCEEDED_RETRIES
+    with l:
+        pixelData = [Pixel, Red, Green, Blue]
+        for i in range(RETRIES):
+            try:
+                bus.write_i2c_block_data(pzaddr, Update, pixelData)
+                return EXIT_SUCCESS
+            except Exception as e:
+                if DEBUG:
+                    print("error in set_pixel(), retrying", file=sys.stderr)
+                    print(e, file=sys.stderr)
+        return EXCEEDED_RETRIES
 
 
 def set_all_pixels(Red, Green, Blue, Update=True):
@@ -200,18 +209,19 @@ def set_all_pixels(Red, Green, Blue, Update=True):
     :param Update: update the pixel data immediately (as it takes time)
     :return: status code
     """
-    if revision < 7:
-        return UNSUPPORTED
-    pixelData = [100, Red, Green, Blue]
-    for i in range(RETRIES):
-        try:
-            bus.write_i2c_block_data(pzaddr, Update, pixelData)
-            return EXIT_SUCCESS
-        except Exception as e:
-            if DEBUG:
-                print("Error in set_all_pixels(), retrying", file=sys.stderr)
-                print(e, file=sys.stderr)
-    return EXCEEDED_RETRIES
+    with l:
+        if revision < 7:
+            return UNSUPPORTED
+        pixelData = [100, Red, Green, Blue]
+        for i in range(RETRIES):
+            try:
+                bus.write_i2c_block_data(pzaddr, Update, pixelData)
+                return EXIT_SUCCESS
+            except Exception as e:
+                if DEBUG:
+                    print("error in set_all_pixels(), retrying", file=sys.stderr)
+                    print(e, file=sys.stderr)
+        return EXCEEDED_RETRIES
 
 
 def update_pixels():
@@ -220,15 +230,16 @@ def update_pixels():
 
     :return: status code
     """
-    for i in range(RETRIES):
-        try:
-            bus.write_byte_data(pzaddr, UPDATENOW, 0)
-            return EXIT_SUCCESS
-        except Exception as e:
-            if DEBUG:
-                print("Error in update_pixels(), retrying", file=sys.stderr)
-                print(e, file=sys.stderr)
-    return EXCEEDED_RETRIES
+    with l:
+        for i in range(RETRIES):
+            try:
+                bus.write_byte_data(pzaddr, UPDATENOW, 0)
+                return EXIT_SUCCESS
+            except Exception as e:
+                if DEBUG:
+                    print("error in update_pixels(), retrying", file=sys.stderr)
+                    print(e, file=sys.stderr)
+        return EXCEEDED_RETRIES
 
 
 def set_brightness(brightness):
@@ -238,15 +249,16 @@ def set_brightness(brightness):
     :param brightness: the new brightness (range 0 to 255; default is 40)
     :return: status code
     """
-    for i in range(RETRIES):
-        try:
-            bus.write_byte_data(pzaddr, SETBRIGHT, brightness)
-            return EXIT_SUCCESS
-        except Exception as e:
-            if DEBUG:
-                print("Error in set_brightness(), retrying", file=sys.stderr)
-                print(e, file=sys.stderr)
-    return EXCEEDED_RETRIES
+    with l:
+        for i in range(RETRIES):
+            try:
+                bus.write_byte_data(pzaddr, SETBRIGHT, brightness)
+                return EXIT_SUCCESS
+            except Exception as e:
+                if DEBUG:
+                    print("error in set_brightness(), retrying", file=sys.stderr)
+                    print(e, file=sys.stderr)
+        return EXCEEDED_RETRIES
 
 
 def init(debug=False):
@@ -263,8 +275,11 @@ def init(debug=False):
 
     for i in range(RETRIES):
         try:
+            l.acquire(blocking=True)
             bus.write_byte_data(pzaddr, RESET, 0)
             time.sleep(0.01)  # 10ms delay to allow time to complete
+            l.release()
+            global revision
             revision = get_revision()[0]  # update the revision number after the board has been initialized
             return EXIT_SUCCESS
         except Exception as e:
@@ -280,13 +295,14 @@ def cleanup():
 
     :return: status code
     """
-    for i in range(RETRIES):
-        try:
-            bus.write_byte_data(pzaddr, RESET, 0)
-            time.sleep(0.01)  # 10ms delay to allow time to complete
-            return EXIT_SUCCESS
-        except Exception as e:
-            if DEBUG:
-                print("error in cleanup(), retrying", file=sys.stderr)
-                print(e, file=sys.stderr)
-    return EXCEEDED_RETRIES
+    with l:
+        for i in range(RETRIES):
+            try:
+                bus.write_byte_data(pzaddr, RESET, 0)
+                time.sleep(0.01)  # 10ms delay to allow time to complete
+                return EXIT_SUCCESS
+            except Exception as e:
+                if DEBUG:
+                    print("error in cleanup(), retrying", file=sys.stderr)
+                    print(e, file=sys.stderr)
+        return EXCEEDED_RETRIES
