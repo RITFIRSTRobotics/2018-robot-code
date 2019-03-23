@@ -46,5 +46,8 @@ class NetworkManager(threading.Thread):
     def send_packet(self, pack):
         # If we have successfully opened a connection to the fms
         if self.csock:
-            self.csock.send(pack.encode())
+            try:
+                self.csock.send(pack.encode())
+            except Exception as e:
+                pass
 
