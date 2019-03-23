@@ -1,10 +1,12 @@
 import threading
-import time
 import socket
+import select
 from core.network.utils import get_ip
 from core.network.constants import *
 
 exitFlag = 0
+recv_lock = threading.Lock()
+
 
 class NetworkManager(threading.Thread):
     def __init__(self, logger):
@@ -20,28 +22,28 @@ class NetworkManager(threading.Thread):
         self.csock = None
         self.fms_addr = None
 
-    def run():
-        self.csock, self.fms_addr = sock.accept()
+    def run(self):
+        self.csock, self.fms_addr = self.sock.accept()
         while self.keep_running:
-            if select.select((self.csock),(),(), 0):
+            if select.select((self.csock), (), (), 0):
                 pack = self.csock.recv(BUFFER_SIZE).decode()
                 recv_lock.acquire()
                 self.recv_packet_queue.append(pack)
                 recv_lock.release()
         self.csock.close()
                 
-    def get_next_packet():
-        retVal = None
+    def get_next_packet(self):
+        return_val = None
         recv_lock.acquire()
         if self.recv_packet_queue:
-            retVal = self.recv_packet_queue.pop(0)
+            return_val = self.recv_packet_queue.pop(0)
         recv_lock.release()
-        return retVal
+        return return_val
 
-    def stop():
+    def stop(self):
         self.keep_running = False
 
-    def send_packet(pack):
+    def send_packet(self, pack):
         # If we have successfully opened a connection to the fms
         if self.csock:
             self.csock.send(pack.encode())
