@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import socket
 import logging
 from json import JSONDecodeError
 from shutil import copyfile
@@ -12,7 +11,6 @@ from logging.handlers import RotatingFileHandler
 sys.path.append(os.getcwd())  # have to add this for local files
 from src.Watchdog import Watchdog
 import libs.piconzero as piconzero
-from core.network.utils import get_ip
 from core.network.Packet import Packet, PacketType
 from core.network.constants import *
 from core.network.packetdata import MovementData
@@ -150,9 +148,9 @@ def main():
         values = jsonpickle.loads(f.read())
 
     # get the results and save them
-    global m_settings, d_settings, state
-    type = values["type"]
-    m_settings = values[type]
+    global robot_type, m_settings, d_settings, state
+    robot_type = values["type"]
+    m_settings = values[robot_type]
     d_settings = values["drive"]
 
     # setup the state object
