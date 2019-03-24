@@ -122,7 +122,7 @@ def process_data(pack):
             # Now for the lift servo
             lift_servo_max = m_settings["lift_min"] + m_settings["lift_range"]
             state.lift_servo_pos += int(pack.data.sticks[2] / m_settings["lift_mod"])
-            if state.lift_servo_pos > m_settings["lift_max"] or state.lift_servo_pos < lift_servo_max:
+            if state.lift_servo_pos > lift_servo_max or state.lift_servo_pos < lift_servo_max:
                 if state.lift_servo_pos > lift_servo_max:
                     state.lift_servo_pos = lift_servo_max
                 else:
@@ -205,7 +205,7 @@ def main():
                             piconzero.set_output_config(m_settings["motor_channel"], 1)  # set channel 0 to PWM mode
                         if is_gripper():
                             piconzero.set_output_config(m_settings["lift_servo"], 2)
-                            piconzero.set_output_config(m_settings["gripper_servo"], 2)  # set channel 0 and 1 to Servo mode
+                            piconzero.set_output_config(m_settings["grip_servo"], 2)  # set channel 0 and 1 to Servo mode
 
                             continue
                         elif pack.data == RobotStateData.DISABLE:
