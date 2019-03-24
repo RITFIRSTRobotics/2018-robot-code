@@ -213,7 +213,6 @@ def main():
 
                 # Process the packet
                 if pack.type == PacketType.STATUS:
-                    logger.info("Got status packet")
                     # Check the contents of the packet
                     if type(pack.data) is RobotStateData:
                         if pack.data == RobotStateData.ENABLE:
@@ -236,7 +235,6 @@ def main():
                             piconzero.cleanup()
                             break
                 elif pack.type == PacketType.REQUEST:
-                    logger.info("Got request packet")
                     # Check for the request type
                     if pack.data == RequestData.STATUS:
                         # Send a response
