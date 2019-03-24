@@ -249,7 +249,6 @@ def main():
                     # do more stuff
                     continue
                 elif pack.type == PacketType.DATA:
-                    logger.info("Got Data Packet")
                     # See if the robot is disabled
                     if robot_disabled:
                         continue
