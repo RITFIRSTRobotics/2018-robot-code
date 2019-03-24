@@ -26,7 +26,7 @@ class NetworkManager(threading.Thread):
     def run(self):
         self.csock, self.fms_addr = self.sock.accept()
         while self.keep_running:
-            if select.select((self.csock), (), (), 0):
+            if select.select((self.csock,), (), (), 0):
                 pack = self.csock.recv(BUFFER_SIZE).decode()
                 recv_lock.acquire()
                 self.recv_packet_queue.append(pack)
