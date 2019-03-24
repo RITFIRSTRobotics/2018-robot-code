@@ -17,6 +17,7 @@ from core.network.constants import *
 from core.network.packetdata import MovementData
 from core.network.packetdata.RequestData import RequestData
 from core.network.packetdata.RobotStateData import RobotStateData
+from networkManager import NetworkManager
 
 
 # Some constants
