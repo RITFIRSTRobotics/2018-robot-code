@@ -213,7 +213,7 @@ def main():
 
                 # Process the packet
                 if pack.type == PacketType.STATUS:
-                    logger.log("Got status packet")
+                    logger.info("Got status packet")
                     # Check the contents of the packet
                     if type(pack.data) is RobotStateData:
                         if pack.data == RobotStateData.ENABLE:
