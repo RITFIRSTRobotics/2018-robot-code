@@ -10,6 +10,7 @@ recv_lock = threading.Lock()
 
 class NetworkManager(threading.Thread):
     def __init__(self, logger):
+        threading.Thread.__init__(self)
         self.logger = logger
         self.logger.info("opening socket")
         self.sock = socket.socket()
