@@ -5,7 +5,6 @@ from core.network.utils import get_ip
 from core.network.constants import *
 
 exitFlag = 0
-recv_lock = threading.Lock()
 
 
 class NetworkManager(threading.Thread):
@@ -22,6 +21,7 @@ class NetworkManager(threading.Thread):
         self.keep_running = True
         self.csock = None
         self.fms_addr = None
+        self.recv_lock = threading.Lock()
 
     def run(self):
         self.csock, self.fms_addr = self.sock.accept()
@@ -36,10 +36,10 @@ class NetworkManager(threading.Thread):
                 
     def get_next_packet(self):
         return_val = None
-        recv_lock.acquire()
+        self.recv_lock.acquire()
         if self.recv_packet_queue:
             return_val = self.recv_packet_queue.pop(0)
-        recv_lock.release()
+        self.recv_lock.release()
         return return_val
 
     def stop(self):
