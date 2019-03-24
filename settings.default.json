@@ -1,0 +1,35 @@
+{
+	"type": "gripper1", 
+
+	"elevator": {
+		"motor_channel": 0,
+		"motor_speed": 80
+	},
+	
+	"gripper1": {
+		"lift_servo": 0,
+		"grip_servo": 1,
+		"lift_min": 43,
+		"lift_range": 52,
+		"lift_mod": 32.0,
+		"grip_min": 0,
+		"grip_max": 100
+	},
+
+	"gripper2": {
+		"lift_servo": 0,
+		"grip_servo": 1,
+		"lift_min": 0,
+		"lift_range": 74,
+		"lift_mod": 32.0,
+		"grip_min": 0,
+		"grip_max": 100
+	},
+
+	"drive": {
+		"forward_mod": 1,
+		"turn_mod": .5,
+		"square_forward": true,
+		"square_turn": true
+	}
+}

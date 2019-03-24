@@ -4,6 +4,7 @@ import time
 import socket
 import logging
 from json import JSONDecodeError
+from shutil import copyfile
 
 import jsonpickle
 from logging.handlers import RotatingFileHandler
@@ -18,62 +19,28 @@ from core.network.packetdata import MovementData
 from core.network.packetdata.RequestData import RequestData
 from core.network.packetdata.RobotStateData import RobotStateData
 
+robot_type = str()
+m_settings = dict()
+d_settings = dict()
+state = None
 
-# Some constants
-SHOOTER_ROBOT = os.path.isfile(".shooterbot")
-GRIPPER_ROBOT = os.path.isfile(".gripperbot")
 
-if SHOOTER_ROBOT and GRIPPER_ROBOT:
-    print("multiple robot subsystems, exiting", file=sys.stderr)
-    exit(1)
+class GripperState:
+    """
+    Class used to store the current state of the manipulator if it is a gripper
+    """
+    def __init__(self, lift_servo_min, grip_servo_min):
+        self.grip_servo_prev = False
+        self.grip_servo_pos = grip_servo_min
+        self.lift_servo_pos = lift_servo_min
 
-SHOOTER_MOTOR_CHANNEL = 0
 
-LIFT_SERVO_CHANNEL = 0
-GRIP_SERVO_CHANNEL = 1
+def is_gripper():
+    return robot_type[:-1] == "gripper"
 
-if SHOOTER_ROBOT:
-    SHOOTER_HIGH = 80
-    SHOOTER_MID = 40
-    SHOOTER_OFF = 0
-    shooter_start = 0
 
-if GRIPPER_ROBOT:
-    LIFT_SERVO_MIN = 43
-    LIFT_SERVO_MAX = 95
-    LIFT_SERVO_SPEEDMOD = 32.0
-    GRIP_SERVO_MIN = 0
-    GRIP_SERVO_MAX = 100
-
-    # Check for the default file and copy it into the expected file if not found
-    if os.path.isfile(".botsettings.def") and not os.path.isfile(".botsettings"):
-        f_def = open(".botsettings.def", "r")
-        f = open(".botsettings", "a+")
-        for l in f_def.readlines():
-            f.write(l)
-        f.close()
-        f_def.close()
-
-    # By reading settings from a file, it makes it easier to tailor to the robot
-    if os.path.isfile(".botsettings"):
-        f = open(".botsettings", "r")
-        for i, line in enumerate(f):
-            if i == 0:
-                LIFT_SERVO_MIN = int(line)
-            elif i == 1:
-                LIFT_SERVO_MAX = int(line)
-            elif i == 2:
-                LIFT_SERVO_SPEEDMOD = float(line)
-            elif i == 3:
-                GRIP_SERVO_MIN = int(line)
-            elif i == 4:
-                GRIP_SERVO_MAX = int(line)
-        f.close()
-        print(GRIP_SERVO_MAX)
-
-    lift_servo_pos = LIFT_SERVO_MIN
-    grip_servo_pos = GRIP_SERVO_MIN
-    grip_servo_prev = False
+def is_elevator():
+    return robot_type == "elevator"
 
 
 def square_scale(x):
@@ -86,14 +53,19 @@ def process_data(pack):
 
     :param pack: a packet with data in it
     """
-    global grip_servo_prev, grip_servo_pos, lift_servo_pos, shooter_start
+    global state
 
     # See if the data is MovementData
     if type(pack.data) is MovementData.MovementData:
         # bindings for old code
         pack.data.scale()
         s_side, s_forw = pack.data.get_stick0()
-        f_forw = square_scale(s_forw)
+
+        # Apply drive settings
+        s_forw_t = s_forw * d_settings["forward_mod"]
+        s_forw = square_scale(s_forw_t) if d_settings["square_forward"] else s_forw_t
+        s_side_t = s_side * d_settings["turn_mod"]
+        s_side = square_scale(s_side_t) if d_settings["square_turn"] else s_side_t
 
         # Calculate motor outputs
         if abs(s_forw) < CONTROLLER_DEADZONE and abs(s_side) < CONTROLLER_DEADZONE:
@@ -130,43 +102,35 @@ def process_data(pack):
         piconzero.set_motor(piconzero.MOTORB, right_motor)
 
         # See if this is a shooter robot (experimental)
-        if SHOOTER_ROBOT:
+        if is_elevator():
             if pack.data.butttons[2]:
-                if shooter_start == 0:
-                    shooter_start = time.time()
-                    piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_HIGH)
-                elif shooter_start - time.time() > 10:
-                    piconzero.set_output(SHOOTER_MOTOR_CHANNEL, 0)
-                else:
-                    piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_HIGH)
-            elif pack.data.buttons[0]:
-                piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_MID)
+                piconzero.set_output(m_settings["motor_channel"], m_settings["motor_speed"])
             else:
-                piconzero.set_output(SHOOTER_MOTOR_CHANNEL, SHOOTER_OFF)
-                shooter_start = 0
+                piconzero.set_output(m_settings["motor_channel"], 0)
 
         # See if this is a gripper robot
-        if GRIPPER_ROBOT:
+        if is_gripper():
             toggle_button = pack.data.buttons[2]
 
             # See if the gripper needs to change
-            if toggle_button != grip_servo_prev and toggle_button == True:
-                if grip_servo_pos == GRIP_SERVO_MIN:
-                    grip_servo_pos = GRIP_SERVO_MAX
+            if toggle_button is not state.grip_servo_prev and toggle_button is True:
+                if state.grip_servo_pos == m_settings["grip_min"]:
+                    grip_servo_pos = m_settings["grip_max"]
                 else:
-                    grip_servo_pos = GRIP_SERVO_MIN
-                piconzero.set_output(GRIP_SERVO_CHANNEL, grip_servo_pos)
+                    grip_servo_pos = m_settings["grip_min"]
+                piconzero.set_output(m_settings["grip_servo"], grip_servo_pos)
 
             # Now for the lift servo
-            lift_servo_pos += int(pack.data.sticks[2] / LIFT_SERVO_SPEEDMOD)
-            if lift_servo_pos > LIFT_SERVO_MAX or lift_servo_pos < LIFT_SERVO_MIN:
-                if lift_servo_pos > LIFT_SERVO_MAX:
-                    lift_servo_pos = LIFT_SERVO_MAX
+            lift_servo_max = m_settings["lift_min"] + m_settings["lift_range"]
+            state.lift_servo_pos += int(pack.data.sticks[2] / m_settings["lift_mod"])
+            if state.lift_servo_pos > m_settings["lift_max"] or state.lift_servo_pos < lift_servo_max:
+                if state.lift_servo_pos > lift_servo_max:
+                    state.lift_servo_pos = lift_servo_max
                 else:
-                    lift_servo_pos = LIFT_SERVO_MIN
+                    state.lift_servo_pos = m_settings["lift_min"]
 
-            piconzero.set_output(LIFT_SERVO_CHANNEL, lift_servo_pos)
-            grip_servo_prev = toggle_button  # save for later
+            piconzero.set_output(m_settings["lift_servo"], state.lift_servo_pos)
+            state.grip_servo_prev = toggle_button  # save for later
 
 
 def main():
@@ -174,6 +138,25 @@ def main():
     logger = logging.getLogger(__name__)
     handler = RotatingFileHandler('robot_log.log', "a", maxBytes=960000, backupCount=5)
     logger.addHandler(handler)
+
+    # check for a default config file
+    if os.path.isfile("settings.default.json") and not os.path.isfile("settings.json"):
+        open("settings.json", "a").close()
+        copyfile("settings.default.json", "settings.json")
+
+    # read the file
+    with open("settings.json", "r") as f:
+        values = jsonpickle.loads(f.read())
+
+    # get the results and save them
+    global m_settings, d_settings, state
+    type = values["type"]
+    m_settings = values[type][:]
+    d_settings = values["drive"][:]
+
+    # setup the state object
+    if is_gripper():
+        state = GripperState(m_settings["lift_min"], m_settings["grip_min"])
 
     # initalize i2c and piconzero
     piconzero.init()
@@ -192,11 +175,11 @@ def main():
     robot_disabled = True
     watchdog = Watchdog(logger)
 
-    if SHOOTER_ROBOT:
-        piconzero.set_output_config(SHOOTER_MOTOR_CHANNEL, 1)  # set channel 0 to PWM mode
-    if GRIPPER_ROBOT:
-        piconzero.set_output_config(LIFT_SERVO_CHANNEL, 2)
-        piconzero.set_output_config(GRIP_SERVO_CHANNEL, 2)  # set channel 0 and 1 to Servo mode
+    if is_elevator():
+        piconzero.set_output_config(m_settings["motor_channel"], 1)  # set channel 0 to PWM mode
+    if is_gripper():
+        piconzero.set_output_config(m_settings["lift_servo"], 2)
+        piconzero.set_output_config(m_settings["grip_servo"], 2)  # set channel 0 and 1 to Servo mode
 
     # Initialization should be done now, start accepting packets
     while True:
@@ -225,11 +208,11 @@ def main():
 
                         # Reinitialize the picon zero
                         piconzero.init()
-                        if SHOOTER_ROBOT:
-                            piconzero.set_output_config(SHOOTER_MOTOR_CHANNEL, 1)  # set channel 0 to PWM mode
-                        if GRIPPER_ROBOT:
-                            piconzero.set_output_config(LIFT_SERVO_CHANNEL, 2)
-                            piconzero.set_output_config(GRIP_SERVO_CHANNEL, 2)  # set channel 0 and 1 to Servo mode
+                        if is_elevator():
+                            piconzero.set_output_config(m_settings["motor_channel"], 1)  # set channel 0 to PWM mode
+                        if is_gripper():
+                            piconzero.set_output_config(m_settings["lift_servo"], 2)
+                            piconzero.set_output_config(m_settings["gripper_servo"], 2)  # set channel 0 and 1 to Servo mode
 
                         continue
                     elif pack.data == RobotStateData.DISABLE:
