@@ -29,9 +29,9 @@ class NetworkManager(threading.Thread):
             if select.select((self.csock,), (), (), 0):
                 pack = self.csock.recv(BUFFER_SIZE).decode()
                 self.logger.info("Recv'd packet")
-                recv_lock.acquire()
+                self.recv_lock.acquire()
                 self.recv_packet_queue.append(pack)
-                recv_lock.release()
+                self.recv_lock.release()
         self.csock.close()
                 
     def get_next_packet(self):
