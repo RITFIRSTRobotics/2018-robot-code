@@ -28,6 +28,7 @@ class NetworkManager(threading.Thread):
         while self.keep_running:
             if select.select((self.csock,), (), (), 0):
                 pack = self.csock.recv(BUFFER_SIZE).decode()
+                self.logger.info("Recv'd packet")
                 recv_lock.acquire()
                 self.recv_packet_queue.append(pack)
                 recv_lock.release()
