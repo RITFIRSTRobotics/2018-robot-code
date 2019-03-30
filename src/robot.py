@@ -132,6 +132,15 @@ def process_data(pack):
             state.grip_servo_prev = toggle_button  # save for later
 
 
+def setup_piconzero():
+    if is_elevator():
+        piconzero.set_output_config(m_settings["motor_channel"], 1)  # set channel 0 to PWM mode
+    if is_gripper():
+        piconzero.set_output_config(m_settings["lift_servo"], 2)
+        piconzero.set_output_config(m_settings["grip_servo"], 2)  # set channel 0 and 1 to Servo mode
+
+
+
 def main():
     # start the logger
     logger = logging.getLogger(__name__)
@@ -168,15 +177,13 @@ def main():
     robot_disabled = True
     watchdog = Watchdog(logger)
 
-    if is_elevator():
-        piconzero.set_output_config(m_settings["motor_channel"], 1)  # set channel 0 to PWM mode
-    if is_gripper():
-        piconzero.set_output_config(m_settings["lift_servo"], 2)
-        piconzero.set_output_config(m_settings["grip_servo"], 2)  # set channel 0 and 1 to Servo mode
+    setup_piconzero()
 
     # Initialization should be done now, start accepting packets
     while True:
         try:
+            if netwk_mgr.get_rerun_setup():
+                setup_piconzero()
             raw_pack = netwk_mgr.get_next_packet()
             if raw_pack is not None:
                 try:
