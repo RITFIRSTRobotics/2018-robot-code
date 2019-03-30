@@ -152,8 +152,8 @@ def main():
     # get the results and save them
     global m_settings, d_settings, state
     type = values["type"]
-    m_settings = values[type][:]
-    d_settings = values["drive"][:]
+    m_settings = values[type]
+    d_settings = values["drive"]
 
     # setup the state object
     if is_gripper():
