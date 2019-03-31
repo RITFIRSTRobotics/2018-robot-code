@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import socket
 import logging
 from json import JSONDecodeError
 from shutil import copyfile
@@ -12,7 +11,6 @@ from logging.handlers import RotatingFileHandler
 sys.path.append(os.getcwd())  # have to add this for local files
 from src.Watchdog import Watchdog
 import libs.piconzero as piconzero
-from core.network.utils import get_ip
 from core.network.Packet import Packet, PacketType
 from core.network.constants import *
 from core.network.packetdata import MovementData
@@ -124,7 +122,7 @@ def process_data(pack):
             # Now for the lift servo
             lift_servo_max = m_settings["lift_min"] + m_settings["lift_range"]
             state.lift_servo_pos += int(pack.data.sticks[2] / m_settings["lift_mod"])
-            if state.lift_servo_pos > m_settings["lift_max"] or state.lift_servo_pos < lift_servo_max:
+            if state.lift_servo_pos > lift_servo_max or state.lift_servo_pos < lift_servo_max:
                 if state.lift_servo_pos > lift_servo_max:
                     state.lift_servo_pos = lift_servo_max
                 else:
@@ -150,9 +148,9 @@ def main():
         values = jsonpickle.loads(f.read())
 
     # get the results and save them
-    global m_settings, d_settings, state
-    type = values["type"]
-    m_settings = values[type]
+    global robot_type, m_settings, d_settings, state
+    robot_type = values["type"]
+    m_settings = values[robot_type]
     d_settings = values["drive"]
 
     # setup the state object
@@ -207,7 +205,7 @@ def main():
                             piconzero.set_output_config(m_settings["motor_channel"], 1)  # set channel 0 to PWM mode
                         if is_gripper():
                             piconzero.set_output_config(m_settings["lift_servo"], 2)
-                            piconzero.set_output_config(m_settings["gripper_servo"], 2)  # set channel 0 and 1 to Servo mode
+                            piconzero.set_output_config(m_settings["grip_servo"], 2)  # set channel 0 and 1 to Servo mode
 
                             continue
                         elif pack.data == RobotStateData.DISABLE:
