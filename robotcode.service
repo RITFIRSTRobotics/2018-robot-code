@@ -1,11 +1,16 @@
 [Unit]
 Description=RIT FIRST ImagineRIT project code startup
-After=multi-user.target
+Wants=network-online.target
+After=multi-user.target network-online.target
 
 [Service]
 Type=idle
+User=pi
 WorkingDirectory=/home/pi/2018-robot-code
 ExecStart=/usr/bin/python3 /home/pi/2018-robot-code/src/robot.py
+ExecStop=/usr/bin/killall -s 9 python3
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
