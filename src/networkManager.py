@@ -33,6 +33,7 @@ class NetworkManager(threading.Thread):
         self.time_of_last_packet = time.time()
         while self.keep_running:
             if time.time() - self.time_of_last_packet > TIMEOUT_TIME:
+                print ("Attempting reconnect")
                 if self.socket_open:
                     self.csock.close()
                     self.socket_open = False
@@ -40,6 +41,7 @@ class NetworkManager(threading.Thread):
                 self.socket_open = True
                 self.rerun_setup = True
             if select.select((self.csock,), (), (), 0):
+                print("Got packet")
                 pack = self.csock.recv(BUFFER_SIZE).decode()
                 self.time_of_last_packet = time.time()
                 self.recv_lock.acquire()
