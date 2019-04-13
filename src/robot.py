@@ -133,12 +133,17 @@ def process_data(pack):
 
 
 def setup_piconzero():
-    if is_elevator():
-        piconzero.set_output_config(m_settings["motor_channel"], 1)  # set channel 0 to PWM mode
-    if is_gripper():
-        piconzero.set_output_config(m_settings["lift_servo"], 2)
-        piconzero.set_output_config(m_settings["grip_servo"], 2)  # set channel 0 and 1 to Servo mode
+    piconzero.init()
 
+    if is_elevator():
+        # set channel 0 to PWM mode
+        piconzero.set_output_config(m_settings["motor_channel"], 1)
+    if is_gripper():
+         # set channel 0 and 1 to Servo mode
+        piconzero.set_output_config(m_settings["lift_servo"], 2)
+        piconzero.set_output(m_settings["lift_servo"], m_settings["lift_min"])
+        piconzero.set_output_config(m_settings["grip_servo"], 2)
+        piconzero.set_output(m_settings["grip_servo"], m_settings["grip_min"])
 
 
 def main():
@@ -167,7 +172,7 @@ def main():
         state = GripperState(m_settings["lift_min"], m_settings["grip_min"])
 
     # initalize i2c and piconzero
-    piconzero.init()
+    setup_piconzero()
 
     # Open the socket and start the listener thread
     netwk_mgr = NetworkManager(logger)
@@ -176,8 +181,6 @@ def main():
     # Make robot stuff
     robot_disabled = True
     watchdog = Watchdog(logger)
-
-    setup_piconzero()
 
     # Initialization should be done now, start accepting packets
     while True:
@@ -207,21 +210,18 @@ def main():
                             robot_disabled = False
 
                         # Reinitialize the picon zero
-                        piconzero.init()
-                        if is_elevator():
-                            piconzero.set_output_config(m_settings["motor_channel"], 1)  # set channel 0 to PWM mode
-                        if is_gripper():
-                            piconzero.set_output_config(m_settings["lift_servo"], 2)
-                            piconzero.set_output_config(m_settings["grip_servo"], 2)  # set channel 0 and 1 to Servo mode
+                        setup_piconzero()
+                        continue
+                        
+                    elif pack.data == RobotStateData.DISABLE:
+                        robot_disabled = True
+                        piconzero.cleanup()
+                        continue
 
-                            continue
-                        elif pack.data == RobotStateData.DISABLE:
-                            robot_disabled = True
-                            piconzero.cleanup()
-                            continue
-                        elif pack.data == RobotStateData.E_STOP:
-                            piconzero.cleanup()
-                            break
+                    elif pack.data == RobotStateData.E_STOP:
+                        piconzero.cleanup()
+                        break
+                        
                 elif pack.type == PacketType.REQUEST:
                     # Check for the request type
                     if pack.data == RequestData.STATUS:
