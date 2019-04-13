@@ -32,6 +32,7 @@ class NetworkManager(threading.Thread):
         self.socket_open = True
         self.time_of_last_packet = time.time()
         while self.keep_running:
+            print("Still running ntwk manager")
             if time.time() - self.time_of_last_packet > TIMEOUT_TIME:
                 print ("Attempting reconnect")
                 if self.socket_open:
