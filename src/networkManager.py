@@ -32,7 +32,6 @@ class NetworkManager(threading.Thread):
         self.socket_open = True
         self.time_of_last_packet = time.time()
         while self.keep_running:
-            print("Still running ntwk manager")
             if time.time() - self.time_of_last_packet > TIMEOUT_TIME:
                 print ("Attempting reconnect")
                 if self.socket_open:
@@ -41,11 +40,16 @@ class NetworkManager(threading.Thread):
                 self.csock, self.fms_addr = self.sock.accept()
                 self.socket_open = True
                 self.rerun_setup = True
-            if select.select((self.csock,), (), (), 0)[0]:
-                pack = self.csock.recv(BUFFER_SIZE).decode()
-                print("Got packet")
+            elif select.select((self.csock,), (), (), 0)[0]:
+                print(select.select((self.csock,), (), (), 0))
+                pack = self.csock.recv(BUFFER_SIZE)
+                print(pack)
+                pack = pack.decode()
+                print(pack)
                 self.time_of_last_packet = time.time()
                 self.recv_packet_queue.append(pack)
+            else:
+                time.sleep(.05)
         self.csock.close()
         self.sock.close()
                 
