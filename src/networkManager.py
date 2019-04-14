@@ -41,13 +41,11 @@ class NetworkManager(threading.Thread):
                 self.csock, self.fms_addr = self.sock.accept()
                 self.socket_open = True
                 self.rerun_setup = True
-            if select.select((self.csock,), (), (), 0):
-                print("Got packet")
+            if select.select((self.csock,), (), (), 0)[0]:
                 pack = self.csock.recv(BUFFER_SIZE).decode()
+                print("Got packet")
                 self.time_of_last_packet = time.time()
-                self.recv_lock.acquire()
                 self.recv_packet_queue.append(pack)
-                self.recv_lock.release()
         self.csock.close()
         self.sock.close()
                 
