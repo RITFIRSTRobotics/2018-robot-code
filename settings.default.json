@@ -28,7 +28,7 @@
 
 	"drive": {
 		"forward_mod": 1,
-		"turn_mod": 0.5,
+		"turn_mod": 1,
 		"square_forward": true,
 		"square_turn": true
 	}
