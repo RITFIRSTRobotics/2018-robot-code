@@ -188,17 +188,19 @@ def main():
             if netwk_mgr.get_rerun_setup():
                 setup_piconzero()
             raw_pack = netwk_mgr.get_next_packet()
-            if raw_pack is not None:
+            if raw_pack is not None and raw_pack != "":
                 try:
                     pack = jsonpickle.decode(raw_pack)  # recieve packets, decode them, then de-json them
                 except JSONDecodeError as e:
                     print(e)
+                    print(raw_pack)
                     logger.warning(str(e))
                     continue
                 watchdog.reset()
 
                 # Type-check the data
                 if type(pack) is not Packet:
+                    print(type(pack))
                     print("pack is not a Packet", file=sys.stderr)
                     continue
 
@@ -223,6 +225,7 @@ def main():
                         break
                         
                 elif pack.type == PacketType.REQUEST:
+                    print("Got request packet")
                     # Check for the request type
                     if pack.data == RequestData.STATUS:
                         # Send a response

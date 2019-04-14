@@ -41,14 +41,12 @@ class NetworkManager(threading.Thread):
                 self.socket_open = True
                 self.rerun_setup = True
             elif select.select((self.csock,), (), (), 0)[0]:
-                print(select.select((self.csock,), (), (), 0))
-                pack = self.csock.recv(BUFFER_SIZE)
-                print(pack)
-                pack = pack.decode()
-                print(pack)
-                self.time_of_last_packet = time.time()
-                self.recv_packet_queue.append(pack)
+                with self.recv_lock:
+                    pack = self.csock.recv(BUFFER_SIZE)
+                    self.time_of_last_packet = time.time()
+                    self.recv_packet_queue.append(pack)
             else:
+                print("Sleeping")
                 time.sleep(.05)
         self.csock.close()
         self.sock.close()
@@ -57,7 +55,7 @@ class NetworkManager(threading.Thread):
         return_val = None
         self.recv_lock.acquire()
         if self.recv_packet_queue:
-            return_val = self.recv_packet_queue.pop(0)
+            return_val = self.recv_packet_queue.pop(0).decode()
         self.recv_lock.release()
         return return_val
 
