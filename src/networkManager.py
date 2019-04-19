@@ -1,6 +1,10 @@
 import threading
 import socket
 import select
+from json import JSONDecodeError
+
+import jsonpickle
+
 from core.network.utils import get_ip
 from core.network.constants import *
 import time
@@ -42,22 +46,41 @@ class NetworkManager(threading.Thread):
                 self.rerun_setup = True
             elif select.select((self.csock,), (), (), 0)[0]:
                 with self.recv_lock:
-                    pack = self.csock.recv(BUFFER_SIZE)
+                    pack = self.csock.recv(BUFFER_SIZE).decode()
+                    packList = pack.split("}{")
+                    if len(packList) > 1:
+                        for i in range(len(packList)):
+                            if i != 0:
+                                packList[i] = "{" + packList[i]
+                            if i != len(packList) - 1:
+                                packList[i] = packList[i] + "}"
                     self.time_of_last_packet = time.time()
-                    self.recv_packet_queue.append(pack)
+                    self.recv_packet_queue.extend(packList)
             else:
-                print("Sleeping")
                 time.sleep(.05)
         self.csock.close()
         self.sock.close()
                 
     def get_next_packet(self):
-        return_val = None
+        ret_val = None
+        pack_string = None
         self.recv_lock.acquire()
         if self.recv_packet_queue:
-            return_val = self.recv_packet_queue.pop(0).decode()
+            pack_string = self.recv_packet_queue.pop(0)
+            try_again = True
+            while try_again:
+                try:
+                    ret_val = jsonpickle.decode(pack_string)
+                    try_again = False
+                except JSONDecodeError as e:
+                    print("Broken packet")
+                    if len(self.recv_packet_queue) > 1:
+                        pack_string = pack_string + self.recv_packet_queue.pop(0)
+                        try_again = True
+                    else:
+                        try_again = False
         self.recv_lock.release()
-        return return_val
+        return ret_val
 
     def stop(self):
         self.keep_running = False
