@@ -30,7 +30,7 @@ def sigterm_handler(signal, frame):
     netwk_mgr.join()
 
 
-signal.signal(signal.SIGTERM, sigterm_handler())
+signal.signal(signal.SIGTERM, sigterm_handler)
 
 
 class GripperState:
