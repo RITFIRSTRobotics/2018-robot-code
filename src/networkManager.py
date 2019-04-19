@@ -37,6 +37,7 @@ class NetworkManager(threading.Thread):
 
     def run(self):
         self.csock, self.fms_addr = self.sock.accept()
+        self.csock.setblocking(True)
         self.socket_open = True
         self.time_of_last_packet = time.time()
         while self.keep_running:
@@ -46,19 +47,20 @@ class NetworkManager(threading.Thread):
                     self.csock.close()
                     self.socket_open = False
                 self.csock, self.fms_addr = self.sock.accept()
+                self.csock.setblocking(True)
                 self.socket_open = True
                 self.rerun_setup = True
             elif select.select((self.csock,), (), (), 0)[0]:
+                pack = self.csock.recv(BUFFER_SIZE).decode()
+                packList = pack.split("}{")
+                if len(packList) > 1:
+                    for i in range(len(packList)):
+                        if i != 0:
+                            packList[i] = "{" + packList[i]
+                        if i != len(packList) - 1:
+                            packList[i] = packList[i] + "}"
+                self.time_of_last_packet = time.time()
                 with self.recv_lock:
-                    pack = self.csock.recv(BUFFER_SIZE).decode()
-                    packList = pack.split("}{")
-                    if len(packList) > 1:
-                        for i in range(len(packList)):
-                            if i != 0:
-                                packList[i] = "{" + packList[i]
-                            if i != len(packList) - 1:
-                                packList[i] = packList[i] + "}"
-                    self.time_of_last_packet = time.time()
                     self.recv_packet_queue.extend(packList)
             else:
                 time.sleep(.05)
@@ -78,7 +80,8 @@ class NetworkManager(threading.Thread):
                     try_again = False
                 except JSONDecodeError as e:
                     print("Broken packet")
-                    if len(self.recv_packet_queue) > 1:
+                    pack_string.strip()
+                    if pack_string[-1] != '}' and len(self.recv_packet_queue) > 1:
                         pack_string = pack_string + self.recv_packet_queue.pop(0)
                         try_again = True
                     else:
