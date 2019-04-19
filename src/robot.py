@@ -1,8 +1,8 @@
 import os
+import signal
 import sys
 import time
 import logging
-from json import JSONDecodeError
 from shutil import copyfile
 
 import jsonpickle
@@ -22,6 +22,15 @@ robot_type = str()
 m_settings = dict()
 d_settings = dict()
 state = None
+
+
+def sigterm_handler(signal, frame):
+    netwk_mgr.stop()
+    piconzero.cleanup()
+    netwk_mgr.join()
+
+
+signal.signal(signal.SIGTERM, sigterm_handler())
 
 
 class GripperState:
@@ -175,6 +184,7 @@ def main():
     setup_piconzero()
 
     # Open the socket and start the listener thread
+    global netwk_mgr
     netwk_mgr = NetworkManager(logger)
     netwk_mgr.start()
 
