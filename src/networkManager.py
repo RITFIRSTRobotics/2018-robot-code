@@ -7,6 +7,10 @@ import jsonpickle
 
 from core.network.utils import get_ip
 from core.network.constants import *
+from core.network.packetdata.MovementData import MovementData
+from core.network.packetdata.PacketData import PacketData
+from core.network.packetdata.RequestData import RequestData
+from core.network.packetdata.RobotStateData import RobotStateData
 import time
 
 exitFlag = 0
