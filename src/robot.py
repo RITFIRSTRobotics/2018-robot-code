@@ -214,18 +214,18 @@ def main():
                         if pack.data == RobotStateData.ENABLE:
                             robot_disabled = False
 
-                        # Reinitialize the picon zero
-                        setup_piconzero()
-                        continue
+                            # Reinitialize the picon zero
+                            setup_piconzero()
+                            continue
                         
-                    elif pack.data == RobotStateData.DISABLE:
-                        robot_disabled = True
-                        piconzero.cleanup()
-                        continue
+                        elif pack.data == RobotStateData.DISABLE:
+                            robot_disabled = True
+                            piconzero.cleanup()
+                            continue
 
-                    elif pack.data == RobotStateData.E_STOP:
-                        piconzero.cleanup()
-                        break
+                        elif pack.data == RobotStateData.E_STOP:
+                            piconzero.cleanup()
+                            break
                         
                 elif pack.type == PacketType.REQUEST:
                     # Check for the request type

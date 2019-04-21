@@ -79,7 +79,6 @@ class NetworkManager(threading.Thread):
                     ret_val = jsonpickle.decode(pack_string)
                     try_again = False
                 except JSONDecodeError as e:
-                    print("Broken packet")
                     pack_string.strip()
                     if pack_string[-1] != '}' and len(self.recv_packet_queue) > 1:
                         pack_string = pack_string + self.recv_packet_queue.pop(0)
