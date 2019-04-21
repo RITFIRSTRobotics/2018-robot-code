@@ -74,7 +74,7 @@ class NetworkManager(threading.Thread):
         if self.recv_packet_queue:
             pack_string = self.recv_packet_queue.pop(0)
             try_again = True
-            while try_again:
+            while pack_string is not None and pack_string and try_again:
                 try:
                     ret_val = jsonpickle.decode(pack_string)
                     try_again = False
