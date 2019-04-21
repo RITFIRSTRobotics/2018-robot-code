@@ -123,19 +123,18 @@ def process_data(pack):
             # See if the gripper needs to change
             if toggle_button is not state.grip_servo_prev and toggle_button is True:
                 if state.grip_servo_pos == m_settings["grip_min"]:
-                    grip_servo_pos = m_settings["grip_max"]
+                    state.grip_servo_pos = m_settings["grip_max"]
                 else:
-                    grip_servo_pos = m_settings["grip_min"]
-                piconzero.set_output(m_settings["grip_servo"], grip_servo_pos)
+                    state.grip_servo_pos = m_settings["grip_min"]
+                piconzero.set_output(m_settings["grip_servo"], state.grip_servo_pos)
 
             # Now for the lift servo
             lift_servo_max = m_settings["lift_min"] + m_settings["lift_range"]
             state.lift_servo_pos += int(pack.data.sticks[2] / m_settings["lift_mod"])
-            if state.lift_servo_pos > lift_servo_max or state.lift_servo_pos < lift_servo_max:
-                if state.lift_servo_pos > lift_servo_max:
-                    state.lift_servo_pos = lift_servo_max
-                else:
-                    state.lift_servo_pos = m_settings["lift_min"]
+            if state.lift_servo_pos > lift_servo_max:
+                state.lift_servo_pos = lift_servo_max
+            elif state.lift_servo_pos < m_settings["lift_min"]:
+                state.lift_servo_pos = m_settings["lift_min"]
 
             piconzero.set_output(m_settings["lift_servo"], state.lift_servo_pos)
             state.grip_servo_prev = toggle_button  # save for later
